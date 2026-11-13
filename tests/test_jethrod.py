@@ -196,7 +196,7 @@ class DaemonPlumbingTest(unittest.TestCase):
         self.assertEqual((cfg, st), ("/etc/jethrod", "/var/lib/jethrod"))
         self.assertEqual(self.j.app_dirs("posix", {}, euid=0), ("/etc/jethrod", "/var/lib/jethrod"))
         cfg, st = self.j.app_dirs("posix", {"XDG_CONFIG_HOME": "/x", "XDG_STATE_HOME": "/y"}, euid=0)
-        self.assertEqual((cfg, st), ("/x/jethrod", "/y/jethrod"))
+        self.assertEqual((cfg, st), (os.path.join("/x", "jethrod"), os.path.join("/y", "jethrod")))
 
     def test_runtime_directory_gets_the_pidfile(self):
         self.j.set_paths(env={"RUNTIME_DIRECTORY": "/run/jethrod", "XDG_STATE_HOME": "/s"})
