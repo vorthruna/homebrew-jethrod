@@ -104,9 +104,10 @@ jobs:
           sudo systemctl reload jethrod
           sleep 2
           sudo systemctl stop jethrod
-          journalctl -u jethrod --no-pager -o short-precise | tail -20
-          journalctl -u jethrod --no-pager | grep -q "reloaded"
-          journalctl -u jethrod --no-pager | grep -q "stopping"
-          test -f /var/lib/private/jethrod/seen.json
+          sudo journalctl -u jethrod --no-pager -o short-precise | tail -20
+          sudo journalctl -u jethrod --no-pager | grep -q "dates on the books"
+          sudo journalctl -u jethrod --no-pager | grep -q "reloaded"
+          sudo journalctl -u jethrod --no-pager | grep -q "stopping"
+          sudo test -f /var/lib/private/jethrod/seen.json
       - name: sysvinit script syntax
         run: sh -n contrib/sysvinit/jethrod && bash -n contrib/openrc/jethrod
