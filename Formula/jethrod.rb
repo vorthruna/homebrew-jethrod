@@ -2,8 +2,8 @@ class Jethrod < Formula
   desc "Novelty daemon: alerts you when Jethro Tull books North American shows"
   homepage "https://github.com/vorthruna/homebrew-jethrod"
   url "https://github.com/vorthruna/homebrew-jethrod.git",
-      tag:      "v0.1.0",
-      revision: "9af086e84d457bfd57738c4a160989c578a2afc3"
+      tag:      "v0.2.0",
+      revision: "3bab07b3de496938f055a5ecd27bb28ba0d934c1"
   license "MIT"
   head "https://github.com/vorthruna/homebrew-jethrod.git", branch: "main"
 
