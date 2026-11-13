@@ -1,0 +1,15 @@
+# Only needed when jethrod logs to a file (sysvinit/OpenRC with --log).
+# Under systemd it logs to the journal; under Homebrew, launchd owns the file.
+# jethrod's WatchedFileHandler reopens on its own; the HUP is belt and braces.
+/var/log/jethrod.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 jethrod adm
+    postrotate
+        [ -s /run/jethrod/jethrod.pid ] && kill -HUP "$(cat /run/jethrod/jethrod.pid)" 2>/dev/null || true
+    endscript
+}

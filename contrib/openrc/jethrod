@@ -1,0 +1,30 @@
+#!/sbin/openrc-run
+# install:  useradd --system --home-dir /var/lib/jethrod --shell /sbin/nologin jethrod
+#           install -m755 contrib/openrc/jethrod /etc/init.d/jethrod
+#           rc-update add jethrod default && rc-service jethrod start
+
+name="jethrod"
+description="Jethro Tull North American tour watcher"
+command="/usr/local/bin/jethrod"
+command_args="--config /etc/jethrod/config --state-dir /var/lib/jethrod --pidfile /run/jethrod/jethrod.pid run --syslog"
+command_user="jethrod:jethrod"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+retry="TERM/15/KILL/5"
+extra_started_commands="reload"
+export JETHROD_DESKTOP=off
+
+depend() {
+    need net
+    use dns logger
+}
+
+start_pre() {
+    checkpath --directory --owner jethrod:jethrod --mode 0755 /var/lib/jethrod /run/jethrod
+}
+
+reload() {
+    ebegin "Reloading ${RC_SVCNAME}"
+    start-stop-daemon --signal HUP --pidfile "${pidfile}"
+    eend $?
+}

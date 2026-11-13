@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jethrod"
+version = "0.2.0"
+description = "Novelty daemon: alerts you when Jethro Tull / Ian Anderson book North American shows"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = []
+classifiers = [
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/vorthruna/homebrew-jethrod"
+
+[project.scripts]
+jethrod = "jethrod:cli"
+
+[tool.setuptools]
+py-modules = ["jethrod"]
+
+[tool.ruff.lint.per-file-ignores]
+# closures used within the same loop iteration, on purpose
+"tests/*" = ["B023"]

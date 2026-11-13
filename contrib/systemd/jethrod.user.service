@@ -1,0 +1,24 @@
+# Per-user jethrod with desktop notifications (notify-send) + ntfy.
+# `jethrod install-service` writes this for you with the right ExecStart.
+#
+#   install -Dm644 jethrod.user.service ~/.config/systemd/user/jethrod.service
+#   systemctl --user daemon-reload && systemctl --user enable --now jethrod
+#   loginctl enable-linger "$USER"   # optional: keep running while logged out
+
+[Unit]
+Description=jethrod - listens for Jethro Tull North American tour dates
+Documentation=man:jethrod(1) https://github.com/vorthruna/homebrew-jethrod
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=%h/.local/bin/jethrod run
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=30
+WatchdogSec=10min
+
+[Install]
+WantedBy=default.target

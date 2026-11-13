@@ -1,0 +1,61 @@
+# System-wide jethrod (headless box / server). Phone pushes only - there is
+# no desktop session to notify, so set ntfy_topic in /etc/jethrod/config.
+#
+#   sudo install -Dm644 jethrod.service /etc/systemd/system/jethrod.service
+#   sudo install -Dm644 /dev/stdin /etc/jethrod/config <<< "ntfy_topic=jethrod-yoursecret"
+#   sudo systemctl daemon-reload && sudo systemctl enable --now jethrod
+#   journalctl -u jethrod -f        sudo systemctl reload jethrod
+#
+# For a desktop login use `jethrod install-service` (a systemd --user unit) instead.
+
+[Unit]
+Description=jethrod - listens for Jethro Tull North American tour dates
+Documentation=man:jethrod(1) https://github.com/vorthruna/homebrew-jethrod
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+# pip/pipx install location; adjust if `command -v jethrod` says otherwise
+ExecStart=/usr/local/bin/jethrod run
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=30
+WatchdogSec=10min
+TimeoutStopSec=15
+
+# Directories (exported to jethrod as $STATE_DIRECTORY etc.)
+DynamicUser=yes
+StateDirectory=jethrod
+ConfigurationDirectory=jethrod
+RuntimeDirectory=jethrod
+Environment=JETHROD_DESKTOP=off
+
+# Sandboxing: it fetches two HTTPS endpoints and writes one JSON file.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

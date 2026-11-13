@@ -1,0 +1,209 @@
+.TH JETHROD 1 "2026-11-13" "jethrod 0.2.0" "User Commands"
+.SH NAME
+jethrod \- daemon that listens for Jethro Tull / Ian Anderson North American tour dates
+.SH SYNOPSIS
+.B jethrod
+.RB [ \-c
+.IR file ]
+.RB [ \-\-state\-dir
+.IR dir ]
+.RB [ \-\-pidfile
+.IR file ]
+.I command
+.RI [ options ]
+.br
+.B jethrod run
+.RB [ \-d | \-\-daemon ]
+.RB [ \-f ]
+.RB [ \-\-log
+.RI [ file ]]
+.RB [ \-\-syslog ]
+.RB [ \-v ]
+.SH DESCRIPTION
+.B jethrod
+polls the official tour feed behind jethrotull.com/tour\-dates (default every
+30 minutes) and raises a high\-priority alert the first time a date in the
+United States, Canada or Mexico appears. Once a day (default 08:00 local) it
+also compares every news post, page, discography, video, gallery, merch and
+band entry on jethrotull.com against what it saw last time and sends one
+low\-priority digest of anything new or changed.
+.PP
+Alerts go to the desktop (terminal\-notifier or osascript on macOS, a toast on
+Windows, notify\-send on Linux) and, if configured, to a phone through
+.BR ntfy .
+Every item alerts exactly once; a delivery that fails on every channel is
+retried on the next poll.
+.SH COMMANDS
+.TP
+.B run
+Run the daemon. Stays in the foreground (what systemd, launchd and OpenRC
+expect) unless
+.B \-\-daemon
+is given.
+.TP
+.BR stop ", " reload ", " kick " [" \-\-site ]
+Signal the running daemon (found via its pidfile): SIGTERM, SIGHUP, SIGUSR1 or
+SIGUSR2. Exit status 3 if it is not running.
+.TP
+.B install\-service
+Linux: write and enable a systemd \-\-user unit. Windows: add a Startup
+shortcut and start now. macOS: use
+.BR "brew services start jethrod" .
+.TP
+.B uninstall\-service
+Undo
+.BR install\-service .
+.TP
+.B check
+Check the tour feed once. Exit 2 if something new was found.
+.TP
+.BR site " [" \-\-recent ]
+Run the site digest once, or list the 10 most recently changed items.
+.TP
+.B status
+Daemon state, paths, alert history and every booked date
+.RB ( >>
+marks North American ones). Exit 3 if the daemon is not running.
+.TP
+.BR test\-alert ", " selftest ", " forget
+Send a test on every channel; verify the geography logic; clear all history.
+.TP
+.BR config " [" \fIkey\fR " " \fIvalue\fR ]
+Show the effective configuration, or set one key in the user config file.
+.SH OPTIONS
+.TP
+.BR \-c ", " \-\-config " \fIfile\fR"
+Configuration file.
+.TP
+.BI \-\-state\-dir " dir"
+Where seen.json (and by default the pidfile and log) live.
+.TP
+.BI \-\-pidfile " file"
+Pidfile. It is also an exclusive lock: a second daemon exits 1, and a stale
+file left by a crash never blocks a start.
+.TP
+.BR \-d ", " \-\-daemon
+Double\-fork, setsid, chdir /, umask 022, stdio to /dev/null. For sysvinit.
+Implies
+.B \-\-log
+unless
+.B \-\-syslog
+is given.
+.TP
+.BR \-\-log " [\fIfile\fR]"
+Log to a file (default
+.IR <state\-dir>/jethrod.log ).
+The file is reopened automatically after rotation.
+.TP
+.B \-\-syslog
+Log to syslog, facility daemon.
+.TP
+.BR \-v ", " \-\-verbose
+Debug logging.
+.SH SIGNALS
+.TP
+.BR SIGTERM ", " SIGINT
+Finish the current step, remove the pidfile, exit 0.
+.TP
+.B SIGHUP
+Re\-read the configuration and reopen the log.
+.TP
+.B SIGUSR1
+Check the tour feed now.
+.TP
+.B SIGUSR2
+Run the site digest now.
+.SH SYSTEMD
+.B jethrod
+is a
+.B Type=notify
+service: it sends READY=1, STATUS=, RELOADING=1, STOPPING=1 and, when
+.B WatchdogSec=
+is set, WATCHDOG=1 keep\-alives, without needing libsystemd. Under the journal
+it logs with
+.BR sd\-daemon (3)
+priority prefixes. It honours
+.BR $STATE_DIRECTORY ,
+.BR $CONFIGURATION_DIRECTORY ,
+.B $RUNTIME_DIRECTORY
+and
+.BR $LOGS_DIRECTORY .
+.SH CONFIGURATION
+A plain
+.I key=value
+file;
+.B #
+starts a comment. Keys:
+.B interval_minutes
+(30, minimum 5),
+.B ntfy_topic
+(empty = off),
+.B ntfy_server
+(https://ntfy.sh),
+.B desktop
+(on|off),
+.B site_watch
+(on|off),
+.B digest_time
+(HH:MM local, 08:00),
+.BR feed .
+Each key can be overridden by an environment variable
+.BR JETHROD_ \fIKEY\fR,
+e.g.
+.BR JETHROD_NTFY_TOPIC .
+.SH FILES
+.TP
+.I /etc/jethrod/config
+System\-wide configuration (POSIX), read first.
+.TP
+.IR ~/.config/jethrod/config ", " %APPDATA%\ejethrod\econfig
+Per\-user configuration (root uses /etc/jethrod/config).
+.TP
+.IR ~/.local/state/jethrod/ ", " /var/lib/jethrod/ ", " %LOCALAPPDATA%\ejethrod\e
+State:
+.I seen.json
+(what has been alerted, the site baseline), default pidfile and log.
+.TP
+.I contrib/
+systemd system and user units, sysvinit and OpenRC scripts, logrotate config
+(installed under
+.I $(brew \-\-prefix)/share/jethrod/contrib
+by Homebrew).
+.SH ENVIRONMENT
+.BR JETHROD_CONFIG ", " JETHROD_STATE_DIR ", " JETHROD_PIDFILE ,
+.BR JETHROD_ \fIKEY\fR,
+.BR XDG_CONFIG_HOME ", " XDG_STATE_HOME ,
+.BR NOTIFY_SOCKET ", " WATCHDOG_USEC ", " JOURNAL_STREAM .
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Error, or another daemon already holds the pidfile.
+.TP
+.B 2
+.B check
+found new North American dates; or a usage error.
+.TP
+.B 3
+.BR stop ", " reload ", " kick ", " status :
+the daemon is not running (LSB).
+.SH EXAMPLES
+.nf
+jethrod config ntfy_topic jethrod\-$(openssl rand \-hex 6)
+jethrod test\-alert
+jethrod install\-service
+journalctl \-\-user \-u jethrod \-f
+jethrod kick \-\-site
+.fi
+.SH SEE ALSO
+.BR systemd.service (5),
+.BR sd_notify (3),
+.BR start\-stop\-daemon (8),
+.BR openrc\-run (8),
+.BR logrotate (8),
+https://ntfy.sh,
+https://jethrotull.com/tour\-dates/
+.SH NOTES
+Unofficial fan toy; not affiliated with Jethro Tull or Ian Anderson.

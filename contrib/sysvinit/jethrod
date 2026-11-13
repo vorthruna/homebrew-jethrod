@@ -1,0 +1,68 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          jethrod
+# Required-Start:    $network $remote_fs $syslog
+# Required-Stop:     $network $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Jethro Tull North American tour watcher
+# Description:       Polls the official Jethro Tull tour feed and pushes an
+#                    alert (ntfy) when North American dates appear.
+### END INIT INFO
+#
+# install:  useradd --system --home-dir /var/lib/jethrod --shell /usr/sbin/nologin jethrod
+#           install -m755 contrib/sysvinit/jethrod /etc/init.d/jethrod
+#           update-rc.d jethrod defaults && service jethrod start
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+NAME=jethrod
+DAEMON=/usr/local/bin/jethrod
+USER=jethrod
+RUNDIR=/run/jethrod
+PIDFILE=$RUNDIR/jethrod.pid
+STATEDIR=/var/lib/jethrod
+CONFIG=/etc/jethrod/config
+LOGFILE=/var/log/jethrod.log
+DAEMON_OPTS="--config $CONFIG --state-dir $STATEDIR --pidfile $PIDFILE"
+
+[ -x "$DAEMON" ] || exit 5
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+. /lib/lsb/init-functions
+
+prepare() {
+    install -d -o "$USER" -g "$USER" -m 0755 "$RUNDIR" "$STATEDIR"
+    [ -e "$LOGFILE" ] || install -o "$USER" -g adm -m 0640 /dev/null "$LOGFILE"
+    JETHROD_DESKTOP=off; export JETHROD_DESKTOP
+}
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $NAME" "$NAME"
+    prepare
+    start-stop-daemon --start --quiet --oknodo --pidfile "$PIDFILE" --chuid "$USER" \
+        --exec "$DAEMON" -- $DAEMON_OPTS run --daemon --log "$LOGFILE"
+    log_end_msg $?
+    ;;
+  stop)
+    log_daemon_msg "Stopping $NAME" "$NAME"
+    start-stop-daemon --stop --quiet --oknodo --retry TERM/15/KILL/5 --pidfile "$PIDFILE"
+    log_end_msg $?
+    ;;
+  reload|force-reload)
+    log_daemon_msg "Reloading $NAME" "$NAME"
+    start-stop-daemon --stop --signal HUP --quiet --pidfile "$PIDFILE"
+    log_end_msg $?
+    ;;
+  restart)
+    $0 stop
+    $0 start
+    ;;
+  status)
+    status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME" && exit 0 || exit $?
+    ;;
+  *)
+    echo "Usage: /etc/init.d/$NAME {start|stop|restart|reload|force-reload|status}" >&2
+    exit 2
+    ;;
+esac
+exit 0
