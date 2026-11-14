@@ -27,7 +27,7 @@ import sys
 import time
 import urllib.request
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 WINDOWS = os.name == "nt"
 NO_WINDOW = 0x08000000 if WINDOWS else 0  # CREATE_NO_WINDOW
 PS_APPID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
@@ -1140,9 +1140,15 @@ def main(argv=None):
 
 def cli():
     try:
-        sys.exit(main())
+        rc = main()
+        sys.stdout.flush()  # surface EPIPE here, not in an ignored shutdown flush
     except KeyboardInterrupt:
         sys.exit(130)
+    except BrokenPipeError:  # `jethrod status | head`: the reader left; leave quietly
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1 if WINDOWS else 141)  # 128 + SIGPIPE, like any well-behaved CLI
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

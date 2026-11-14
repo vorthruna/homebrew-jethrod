@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jethrod"
-version = "0.2.0"
+version = "0.2.1"
 description = "Novelty daemon: alerts you when Jethro Tull / Ian Anderson book North American shows"
 readme = "README.md"
 license = { text = "MIT" }

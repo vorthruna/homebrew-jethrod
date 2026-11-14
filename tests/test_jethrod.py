@@ -305,5 +305,26 @@ class DaemonLifecycleTest(unittest.TestCase):
         self.assertEqual(self.jet("stop").returncode, 3)          # LSB "not running"
 
 
+
+@unittest.skipUnless(POSIX, "EPIPE semantics")
+class BrokenPipeTest(unittest.TestCase):
+    """`jethrod status | head` must not spray a traceback when head exits."""
+
+    def test_reader_closing_early_is_quiet(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmp:
+            env = dict(os.environ, XDG_STATE_HOME=tmp, XDG_CONFIG_HOME=tmp,
+                       JETHROD_FEED="file://" + FIXTURE)
+            r, w = os.pipe()
+            os.close(r)  # the reader is already gone before we print a byte
+            proc = subprocess.run([sys.executable, SCRIPT, "status"], stdout=w,
+                                  stderr=subprocess.PIPE, env=env, timeout=60)
+            os.close(w)
+        self.assertNotIn(b"Traceback", proc.stderr)
+        self.assertNotIn(b"Exception ignored", proc.stderr)
+        self.assertEqual(proc.returncode, 141)
+
+
 if __name__ == "__main__":
     unittest.main()
