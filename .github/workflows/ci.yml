@@ -44,7 +44,8 @@ jobs:
           JETHROD_FEED: file://${{ github.workspace }}/tests/feed_2026-11-13.json
           JETHROD_DESKTOP: "off"
         run: jethrod check | tee out.txt && grep -q "none in North America" out.txt
-      - name: live tour feed + live site
+      - name: live tour feed + live site (smoke; someone else's servers, so not a gate)
+        continue-on-error: true
         shell: bash
         run: |
           jethrod status || [ $? -eq 3 ]   # 3 = daemon not running, expected here
