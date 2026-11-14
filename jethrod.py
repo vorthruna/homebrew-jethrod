@@ -10,6 +10,7 @@ jethrotull.com (news, pages, discography, video...). No email. Ever.
 """
 import argparse
 import base64
+import contextlib
 import datetime as dt
 import html
 import json
@@ -27,13 +28,15 @@ import sys
 import time
 import urllib.request
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 WINDOWS = os.name == "nt"
 NO_WINDOW = 0x08000000 if WINDOWS else 0  # CREATE_NO_WINDOW
 PS_APPID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
 FEED = ("https://cdn.seated.com/api/tour/"
         "37997a6d-2133-40b4-90dd-e58363cc2192?include=tour-events")
 TOUR_PAGE = "https://jethrotull.com/tour-dates/"
+DESCRIPTION = ("jethrod - listens for Jethro Tull / Ian Anderson tour dates in North America "
+               "and for changes on jethrotull.com")
 UA = "jethrod/%s (+https://github.com/vorthruna/homebrew-jethrod)" % VERSION
 
 BANNER = r"""
@@ -185,6 +188,12 @@ NA_CITIES = {
 DUP_CITIES = {"rochester", "albany", "portland", "boston", "berkeley", "hollywood",
               "columbus", "halifax", "laval", "hamilton", "kingston"}
 NA_CITY = {c: r for r, cities in NA_CITIES.items() for c in cities}
+# Bare cities where an evening show also lands late in UTC but is not North America.
+FOREIGN_CITIES = {"são paulo", "sao paulo", "rio de janeiro", "porto alegre", "curitiba",
+                  "belo horizonte", "brasília", "brasilia", "buenos aires", "rosario",
+                  "córdoba", "santiago", "santiago de chile", "lima", "bogotá", "bogota",
+                  "medellín", "medellin", "montevideo", "quito", "caracas", "asunción",
+                  "asuncion", "la paz"}
 REGIONS = {"US", "CA", "MX"}
 
 
@@ -222,6 +231,8 @@ def locate(address):
                 return reg, "sure"
     if city_region:
         return city_region, ("maybe" if city in DUP_CITIES else "sure")
+    if city in FOREIGN_CITIES:
+        return None, "foreign"
     return None, "unknown"
 
 
@@ -317,10 +328,40 @@ def save_config_value(key, value):
 
 def load_state():
     try:
-        with open(STATE_FILE) as fh:
-            return json.load(fh)
+        with open(STATE_FILE, encoding="utf-8") as fh:
+            state = json.load(fh)
     except (FileNotFoundError, ValueError):
-        return {"alerted": {}, "last_check": None, "last_total": None}
+        state = {}
+    if not isinstance(state, dict):
+        state = {}
+    if not isinstance(state.get("alerted"), dict):
+        state["alerted"] = {}
+    state.setdefault("last_check", None)
+    state.setdefault("last_total", None)
+    return state
+
+
+@contextlib.contextmanager
+def state_lock(timeout=120.0):
+    """Serialise read-modify-write of the state file across processes, so a CLI
+    `check` racing the daemon can't alert twice or clobber the site baseline."""
+    path = STATE_FILE + ".lock"
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        end = time.monotonic() + timeout
+        while True:
+            try:
+                PidFile.lock(fd)
+                break
+            except OSError:
+                if time.monotonic() > end:
+                    raise
+                time.sleep(0.05)
+        yield
+    finally:
+        PidFile.unlock(fd)
+        os.close(fd)
 
 
 def save_state(state):
@@ -460,6 +501,17 @@ class PidFile:
             os.lseek(fd, _LOCK_OFFSET, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
             os.lseek(fd, 0, os.SEEK_SET)
+
+    @staticmethod
+    def unlock(fd):
+        try:
+            if fcntl:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            elif msvcrt:
+                os.lseek(fd, _LOCK_OFFSET, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
 
     def acquire(self):
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
@@ -617,6 +669,13 @@ def uninstall_service():
 
 
 # ---------------------------------------------------------------- alerts
+def applescript_string(text):
+    """AppleScript string literal. AppleScript knows \\ \" \n \t but not \\uXXXX,
+    so Unicode stays literal ("Poznań", not "Pozna\\u0144")."""
+    t = str(text).replace("\\", "\\\\").replace('"', '\\"')
+    return '"%s"' % t.replace("\r\n", "\n").replace("\n", "\\n").replace("\t", "\\t")
+
+
 def notify(cfg, title, body, log=print, click=TOUR_PAGE, priority="high", tags="flute,tada"):
     sent = []
     if flag(cfg.get("desktop", "on")):
@@ -632,7 +691,7 @@ def notify(cfg, title, body, log=print, click=TOUR_PAGE, priority="high", tags="
                 sent.append("terminal-notifier")
             elif sys.platform == "darwin":
                 script = "display notification %s with title %s sound name \"Glass\"" % (
-                    json.dumps(body), json.dumps(title))
+                    applescript_string(body), applescript_string(title))
                 subprocess.run(["osascript", "-e", script], check=True,
                                capture_output=True, timeout=15)
                 sent.append("osascript")
@@ -665,8 +724,12 @@ def notify(cfg, title, body, log=print, click=TOUR_PAGE, priority="high", tags="
 
 # ------------------------------------------------------------------ core
 def check_once(cfg, log=print, quiet=False):
-    doc = fetch(cfg["feed"])
-    evts = events(doc)
+    evts = events(fetch(cfg["feed"]))  # network stays outside the lock
+    with state_lock():
+        return _record_check(cfg, evts, log, quiet)
+
+
+def _record_check(cfg, evts, log, quiet):
     state = load_state()
     fresh = [e for e in interesting(evts) if e["id"] not in state["alerted"]]
     state["last_check"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -740,9 +803,14 @@ def site_digest(cfg, log=print, get=None, notify_fn=None):
     """Compare the site against what we saw last time; one notification for all of it.
     First run just records a baseline."""
     notify_fn = notify_fn or notify
-    state = load_state()
     ok = []
-    snap = site_snapshot(get=get, log=log, ok=ok)
+    snap = site_snapshot(get=get, log=log, ok=ok)  # network stays outside the lock
+    with state_lock():
+        return _record_site(cfg, snap, ok, log, notify_fn)
+
+
+def _record_site(cfg, snap, ok, log, notify_fn):
+    state = load_state()
     known = state.get("site") or {}
     seen_types = set(state.get("site_types") or {k.split(":", 1)[0] for k in known})
     first = not known
@@ -1016,7 +1084,7 @@ def selftest():
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="jethrod", description=__doc__.split("\n")[0],
+    p = argparse.ArgumentParser(prog="jethrod", description=DESCRIPTION,
                                 epilog="see man jethrod(1) for signals, files and exit codes")
     p.add_argument("--version", action="version", version="jethrod " + VERSION)
     p.add_argument("-c", "--config", metavar="FILE", help="config file (default: %s)" % CONFIG_FILE)
@@ -1124,7 +1192,8 @@ def main(argv=None):
     if args.cmd == "config":
         if args.key and args.value is not None:
             save_config_value(args.key, args.value)
-            print("%s=%s  (apply: jethrod reload)" % (args.key, args.value))
+            print("%s=%s  (apply: %s)" % (args.key, args.value, "jethrod install-service"
+                                          if WINDOWS else "jethrod reload"))
         else:
             for key in DEFAULTS:
                 print("%s=%s" % (key, cfg.get(key, "")))
@@ -1138,16 +1207,32 @@ def main(argv=None):
     return 0
 
 
+def error_text(exc):
+    reason = getattr(exc, "reason", None)  # urllib.error.URLError
+    if reason is not None:
+        return "%s: %s" % (getattr(exc, "url", "") or "network", reason)
+    if isinstance(exc, OSError) and exc.filename:
+        return "%s: %s" % (exc.filename, exc.strerror or exc)
+    return str(exc) or exc.__class__.__name__
+
+
 def cli():
     try:
         rc = main()
-        sys.stdout.flush()  # surface EPIPE here, not in an ignored shutdown flush
+        if sys.stdout is not None:  # pythonw has no stdout
+            sys.stdout.flush()  # surface EPIPE here, not in an ignored shutdown flush
     except KeyboardInterrupt:
         sys.exit(130)
     except BrokenPipeError:  # `jethrod status | head`: the reader left; leave quietly
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, sys.stdout.fileno())
         sys.exit(1 if WINDOWS else 141)  # 128 + SIGPIPE, like any well-behaved CLI
+    except (OSError, ValueError, RuntimeError) as exc:  # offline, bad file, bad JSON
+        if os.environ.get("JETHROD_DEBUG"):
+            raise
+        if sys.stderr is not None:
+            print("jethrod: %s" % error_text(exc), file=sys.stderr)
+        sys.exit(1)
     sys.exit(rc)
 
 

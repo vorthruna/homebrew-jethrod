@@ -1,4 +1,4 @@
-"""Mutation check: re-inject each bug class into a scratch copy; the pairwise suite must
+"""Mutation check: re-inject each bug class into a scratch copy; the test suite must
 fail every time. Run: python tests/mutate.py"""
 import os, shutil, subprocess, sys, tempfile
 
@@ -20,6 +20,12 @@ MUTANTS = {
     "ntfy priority wrong": ('{"high": 4, "default": 3}', '{"high": 3, "default": 3}'),
     "ntfy topic not stripped": ('topic = cfg.get("ntfy_topic", "").strip()', 'topic = cfg.get("ntfy_topic", "")'),
     "padding breaks addresses": ('re.sub(r"\\s+", " ", (s or "").strip().lower())', '(s or "").lower()'),
+    "no state lock (double alert)": ("                PidFile.lock(fd)\n                break", "                break"),
+    "bare foreign city = NA": ('    if city in FOREIGN_CITIES:\n        return None, "foreign"\n', ''),
+    "AppleScript \\u escapes": ("applescript_string(body), applescript_string(title))", "json.dumps(body), json.dumps(title))"),
+    "CLI traceback when offline": ("except (OSError, ValueError, RuntimeError) as exc:  # offline", "except ZeroDivisionError as exc:  # offline"),
+    "pythonw flush crash": ("        if sys.stdout is not None:  # pythonw has no stdout\n            sys.stdout.flush()", "        if True:\n            sys.stdout.flush()"),
+    "state missing keys": ('    if not isinstance(state.get("alerted"), dict):', '    if False:'),
 }
 survivors = []
 for name, (old, new) in MUTANTS.items():
@@ -29,8 +35,8 @@ for name, (old, new) in MUTANTS.items():
     s = open(path, encoding="utf-8").read()
     assert s.count(old) == 1, "mutant %r: anchor found %d times" % (name, s.count(old))
     open(path, "w", encoding="utf-8").write(s.replace(old, new))
-    r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests",
-                        "-p", "test_pairwise.py"], cwd=os.path.join(tmp, "r"),
+    r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
+                       cwd=os.path.join(tmp, "r"),
                        capture_output=True, text=True)
     killed = r.returncode != 0
     print("%-32s %s" % (name, "KILLED" if killed else "SURVIVED  <---"))

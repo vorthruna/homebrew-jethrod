@@ -115,7 +115,8 @@ class GeneratorTest(unittest.TestCase):
 # ========================================= 1. where is this show, really?
 CITIES = {"Chicago": ("US", "unique"), "Toronto": ("CA", "unique"),
           "Rochester": ("US", "dup"), "Halifax": ("CA", "dup"),   # namesakes in the UK
-          "Bonn": (None, None), "Lenox": (None, None)}
+          "Bonn": (None, None), "Lenox": (None, None),
+          "São Paulo": (None, "foreign")}                          # evening = late UTC, not NA
 QUALS = {  # text: (kind, region, collides with an ISO country code)
     "": ("none", None, False), "TX": ("code", "US", False), "tx 78701": ("code", "US", False),
     "DE": ("code", "US", True), "NL": ("code", "CA", True), "ON M5V 3L9": ("code", "CA", False),
@@ -138,6 +139,8 @@ def expect_place(city, qual, clock):
         reg, maybe = qreg, collides and creg != qreg
     elif creg:
         reg, maybe = creg, ckind == "dup"
+    elif ckind == "foreign":
+        return None, False
     else:
         return None, clock == "americas"         # nothing to go on but the clock
     if maybe and clock == "europe":

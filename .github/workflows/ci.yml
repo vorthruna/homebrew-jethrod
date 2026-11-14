@@ -25,9 +25,15 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: unit + lifecycle tests
         run: python -m unittest discover -s tests -v
-      - name: mutation check (the pairwise suite must catch every re-injected bug)
+      - name: mutation check (the suite must catch every re-injected bug)
         if: matrix.python == '3.13'
         run: python tests/mutate.py
+      - name: sdist builds with no deprecation warnings
+        if: matrix.python == '3.13' && runner.os == 'Linux'
+        run: |
+          python -m pip install -q build
+          python -m build --sdist --outdir dist . 2>&1 | tee build.log
+          ! grep -iE "deprecat|SetuptoolsWarning" build.log
       - name: install as a package (the pipx path)
         run: python -m pip install .
       - run: jethrod --version

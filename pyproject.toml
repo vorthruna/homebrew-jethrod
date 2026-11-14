@@ -1,13 +1,14 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "jethrod"
-version = "0.2.1"
+version = "0.2.2"
 description = "Novelty daemon: alerts you when Jethro Tull / Ian Anderson book North American shows"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"  # floor = oldest Python CI runs (macOS /usr/bin/python3, RHEL 9, Debian 11)
 dependencies = []
 classifiers = [
