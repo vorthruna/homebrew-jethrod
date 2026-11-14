@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Novelty daemon: alerts you when Jethro Tull / Ian Anderson book North American shows"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"  # floor = oldest Python CI runs (macOS /usr/bin/python3, RHEL 9, Debian 11)
 dependencies = []
 classifiers = [
   "Operating System :: MacOS",
