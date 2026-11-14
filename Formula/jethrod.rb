@@ -3,7 +3,7 @@ class Jethrod < Formula
   homepage "https://github.com/vorthruna/homebrew-jethrod"
   url "https://github.com/vorthruna/homebrew-jethrod.git",
       tag:      "v0.2.2",
-      revision: "096a1f341f57b3e112b0a415685e846bbfece60c"
+      revision: "c6e77e01e8b9ae9cb27eba5939beb0a565634fb7"
   license "MIT"
   head "https://github.com/vorthruna/homebrew-jethrod.git", branch: "main"
 
