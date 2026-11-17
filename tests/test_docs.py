@@ -1,6 +1,5 @@
 """Fitness function for the docs: the README and the man page name every command and
 config key the code has. Written after the 0.2.x README still described 0.1.0."""
-import argparse
 import io
 import os
 import re
