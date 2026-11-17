@@ -28,7 +28,7 @@ import sys
 import time
 import urllib.request
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 WINDOWS = os.name == "nt"
 NO_WINDOW = 0x08000000 if WINDOWS else 0  # CREATE_NO_WINDOW
 PS_APPID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
@@ -102,6 +102,7 @@ DEFAULTS = {
     "ntfy_server": "https://ntfy.sh",
     "desktop": "on",
     "feed": FEED,
+    "site": "https://jethrotull.com",
     "site_watch": "on",
     "digest_time": "08:00",
 }
@@ -746,7 +747,11 @@ def _record_check(cfg, evts, log, quiet):
             for e in fresh:
                 state["alerted"][e["id"]] = describe(e)
     elif not quiet:
-        log("%d dates on the books, none in North America. Still on one leg." % len(evts))
+        na = len(interesting(evts))
+        if na:
+            log("%d dates on the books, %d in North America, already reported." % (len(evts), na))
+        else:
+            log("%d dates on the books, none in North America. Still on one leg." % len(evts))
     save_state(state)
     return fresh, evts
 
@@ -756,7 +761,7 @@ def _plain(rendered):
     return html.unescape(re.sub(r"<[^>]+>", "", rendered or "")).strip() or "(untitled)"
 
 
-def site_snapshot(get=None, log=print, ok=None):
+def site_snapshot(get=None, log=print, ok=None, site=SITE):
     """Most-recently-modified 50 items of every content type on the site,
     straight from WordPress (more truthful than its sitemap's lastmod).
     Bases that answered are appended to `ok`."""
@@ -765,7 +770,7 @@ def site_snapshot(get=None, log=print, ok=None):
     snap, failures = {}, 0
     for base, label in SITE_TYPES:
         url = ("%s/wp-json/wp/v2/%s?per_page=50&orderby=modified&order=desc"
-               "&_fields=id,link,modified_gmt,title" % (SITE, base))
+               "&_fields=id,link,modified_gmt,title" % (site.rstrip("/"), base))
         try:
             items = get(url)
         except Exception as exc:  # noqa: BLE001 - one bad type shouldn't sink the digest
@@ -780,7 +785,7 @@ def site_snapshot(get=None, log=print, ok=None):
         for it in items:
             snap["%s:%s" % (base, it.get("id"))] = {
                 "label": label, "title": _plain((it.get("title") or {}).get("rendered")),
-                "link": it.get("link") or SITE, "modified": it.get("modified_gmt") or ""}
+                "link": it.get("link") or site, "modified": it.get("modified_gmt") or ""}
     if failures == len(SITE_TYPES):
         raise RuntimeError("site unreachable")
     return snap
@@ -804,7 +809,8 @@ def site_digest(cfg, log=print, get=None, notify_fn=None):
     First run just records a baseline."""
     notify_fn = notify_fn or notify
     ok = []
-    snap = site_snapshot(get=get, log=log, ok=ok)  # network stays outside the lock
+    snap = site_snapshot(get=get, log=log, ok=ok,  # network stays outside the lock
+                         site=(cfg.get("site") or SITE).strip())
     with state_lock():
         return _record_site(cfg, snap, ok, log, notify_fn)
 
@@ -826,7 +832,7 @@ def _record_site(cfg, snap, ok, log, notify_fn):
                  for k, it in changes[:6]]
         if n > 6:
             lines.append("+%d more" % (n - 6))
-        click = changes[0][1]["link"] if n == 1 else SITE
+        click = changes[0][1]["link"] if n == 1 else (cfg.get("site") or SITE).strip()
         sent = notify_fn(cfg, title, "\n".join(lines), log=log, click=click,
                          priority="default", tags="newspaper")
         for k, it in changes:
@@ -1159,7 +1165,7 @@ def main(argv=None):
         return 2 if fresh else 0
     if args.cmd == "site":
         if args.recent:
-            snap = sorted(site_snapshot().values(), key=lambda i: i["modified"], reverse=True)
+            snap = sorted(site_snapshot(site=(cfg.get("site") or SITE).strip()).values(), key=lambda i: i["modified"], reverse=True)
             for it in snap[:10]:
                 print("%s  %-11s %s\n%s%s" % (it["modified"][:10], it["label"], it["title"],
                                               " " * 25, it["link"]))

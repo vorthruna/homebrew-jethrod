@@ -26,6 +26,10 @@ MUTANTS = {
     "CLI traceback when offline": ("except (OSError, ValueError, RuntimeError) as exc:  # offline", "except ZeroDivisionError as exc:  # offline"),
     "pythonw flush crash": ("        if sys.stdout is not None:  # pythonw has no stdout\n            sys.stdout.flush()", "        if True:\n            sys.stdout.flush()"),
     "state missing keys": ('    if not isinstance(state.get("alerted"), dict):', '    if False:'),
+    "site setting ignored": ('                         site=(cfg.get("site") or SITE).strip())', '                         site=SITE)'),
+    "USR1 does nothing": ('        self._on("SIGUSR1", kick)', '        pass'),
+    "HUP keeps old config": ('                    cfg = load_config()\n                    LOG.info("reloaded', '                    LOG.info("reloaded'),
+    "log says none in NA": ('        if na:\n            log(', '        if False:\n            log('),
 }
 survivors = []
 for name, (old, new) in MUTANTS.items():

@@ -1,4 +1,4 @@
-.TH JETHROD 1 "2026-11-13" "jethrod 0.2.2" "User Commands"
+.TH JETHROD 1 "2026-11-13" "jethrod 0.2.3" "User Commands"
 .SH NAME
 jethrod \- daemon that listens for Jethro Tull / Ian Anderson North American tour dates
 .SH SYNOPSIS
@@ -146,7 +146,9 @@ starts a comment. Keys:
 (on|off),
 .B digest_time
 (HH:MM local, 08:00),
-.BR feed .
+.BR feed ,
+.B site
+(https://jethrotull.com).
 Each key can be overridden by an environment variable
 .BR JETHROD_ \fIKEY\fR,
 e.g.
