@@ -31,8 +31,15 @@ MUTANTS = {
     "HUP keeps old config": ('                    cfg = load_config()\n                    LOG.info("reloaded', '                    LOG.info("reloaded'),
     "log says none in NA": ('        if na:\n            log(', '        if False:\n            log('),
 }
+# Caught only by the daemon tests, which need POSIX signals (skipped on Windows).
+POSIX_ONLY = {"USR1 does nothing", "HUP keeps old config", "log says none in NA"}
 survivors = []
+skipped = 0
 for name, (old, new) in MUTANTS.items():
+    if os.name != "posix" and name in POSIX_ONLY:
+        print("%-32s %s" % (name, "skipped (needs POSIX signals)"))
+        skipped += 1
+        continue
     tmp = tempfile.mkdtemp()
     shutil.copytree(SRC, os.path.join(tmp, "r"), ignore=shutil.ignore_patterns(".git"))
     path = os.path.join(tmp, "r", "jethrod.py")
@@ -47,5 +54,6 @@ for name, (old, new) in MUTANTS.items():
     if not killed:
         survivors.append(name)
     shutil.rmtree(tmp)
-print("\n%d/%d mutants killed" % (len(MUTANTS) - len(survivors), len(MUTANTS)))
+print("\n%d/%d mutants killed%s" % (len(MUTANTS) - skipped - len(survivors), len(MUTANTS) - skipped,
+                                     " (%d skipped on this OS)" % skipped if skipped else ""))
 sys.exit(1 if survivors else 0)

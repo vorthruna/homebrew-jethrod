@@ -229,7 +229,7 @@ class CliEndToEnd(E2E):
         for trap in ("Bonn", "São Paulo", "Rochester"):
             self.assertNotIn(trap, push["message"])
         if POSIX:
-            self.assertIn("Austin, TX", self.read(self.desktop_log))
+            self.assertIn("Austin, TX", self.read(self.desktop_log), r.stdout + r.stderr)
 
         r = self.jet("check")
         self.assertEqual((r.returncode, len(self.net.pushes_copy())), (0, 1), "alerted twice")
@@ -296,7 +296,7 @@ class CliEndToEnd(E2E):
         self.assertIn("ntfy", r.stdout)
         self.assertEqual(self.net.pushes_copy()[0]["title"], "jethrod test")
         if POSIX:
-            self.assertIn("jethrod test", self.read(self.desktop_log))
+            self.assertIn("jethrod test", self.read(self.desktop_log), r.stdout + r.stderr)
 
 
 # ===================================================== daemon, POSIX
@@ -318,7 +318,7 @@ class DaemonEndToEnd(E2E):
         self.assertEqual(self.jet("kick").returncode, 0)
         self.wait_for("tour push", lambda: len(self.net.pushes_copy()) == 1)
         self.assertIn("Saratoga Springs, NY", self.net.pushes_copy()[0]["message"])
-        self.assertIn("Saratoga Springs, NY", self.read(self.desktop_log))
+        self.assertIn("Saratoga Springs, NY", self.read(self.desktop_log), self.read(self.log))
 
         before = self.rounds()
         self.jet("kick")
