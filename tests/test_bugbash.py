@@ -90,6 +90,19 @@ class B_AppleScript(Env):
         self.assertIn("Poznań", script)
         self.assertNotIn("\\u", script)
 
+    def test_linux_ignores_a_stray_terminal_notifier(self):
+        """Found by e2e on the ubuntu-24.04 runner: a terminal-notifier on a Linux PATH
+        was chosen over notify-send, failed, and the desktop alert was lost."""
+        seen = []
+        with mock.patch.object(self.j.sys, "platform", "linux"), \
+                mock.patch.object(self.j, "WINDOWS", False), \
+                mock.patch.object(self.j.shutil, "which", lambda b: "/usr/local/bin/" + b), \
+                mock.patch.object(self.j.subprocess, "run", lambda cmd, **k: seen.append(cmd)):
+            got = self.j.notify(dict(self.j.DEFAULTS, desktop="on", ntfy_topic=""),
+                                "t", "b", log=lambda m: None)
+        self.assertEqual(got, ["notify-send"])
+        self.assertEqual(seen[0][0], "notify-send")
+
     @unittest.skipUnless(sys.platform == "darwin", "needs osascript")
     def test_osascript_round_trips_the_literal(self):
         text = 'Poznań "Hall" \\ back\nslash'

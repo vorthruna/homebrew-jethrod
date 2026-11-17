@@ -680,9 +680,11 @@ def applescript_string(text):
 def notify(cfg, title, body, log=print, click=TOUR_PAGE, priority="high", tags="flute,tada"):
     sent = []
     if flag(cfg.get("desktop", "on")):
-        tn = shutil.which("terminal-notifier") or (
-            "/opt/homebrew/bin/terminal-notifier"
-            if os.path.exists("/opt/homebrew/bin/terminal-notifier") else None)
+        tn = None
+        if sys.platform == "darwin":  # a macOS tool; a stray copy on Linux must not win
+            tn = shutil.which("terminal-notifier") or (
+                "/opt/homebrew/bin/terminal-notifier"
+                if os.path.exists("/opt/homebrew/bin/terminal-notifier") else None)
         try:
             if tn:
                 subprocess.run([tn, "-title", title, "-message", body,

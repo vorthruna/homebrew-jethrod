@@ -30,6 +30,7 @@ MUTANTS = {
     "USR1 does nothing": ('        self._on("SIGUSR1", kick)', '        pass'),
     "HUP keeps old config": ('                    cfg = load_config()\n                    LOG.info("reloaded', '                    LOG.info("reloaded'),
     "log says none in NA": ('        if na:\n            log(', '        if False:\n            log('),
+    "terminal-notifier off macOS": ('        if sys.platform == "darwin":  # a macOS tool', '        if True:  # a macOS tool'),
 }
 # Caught only by the daemon tests, which need POSIX signals (skipped on Windows).
 POSIX_ONLY = {"USR1 does nothing", "HUP keeps old config", "log says none in NA"}
